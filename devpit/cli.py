@@ -8,10 +8,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from . import config as cfg_mod
 from . import notes as notes_mod
 from . import repos as repos_mod
+from . import sizes as sizes_mod
 
 C = {"reset": "\033[0m", "dim": "\033[2m", "bold": "\033[1m",
      "red": "\033[31m", "green": "\033[32m", "yellow": "\033[33m",
@@ -54,6 +56,38 @@ def cmd_repos(args) -> int:
         print(f"  {paint(r['name'], 'bold'):<26} {(r.get('branch') or '?')[:26]:<28}"
               f"{' '.join(bits):<26} {flags}")
     print(f"\n  {len(data['repos'])} repos, {data['duration_ms']} ms")
+    return 0
+
+
+def _mb(n: int) -> str:
+    return f"{n/1024:.1f}G" if n >= 1024 else f"{n}M"
+
+
+def cmd_size(args) -> int:
+    cfg = cfg_mod.load()
+    paths = repos_mod.discover(cfg)
+    if args.repo:
+        paths = [p for p in paths if p.name == args.repo or str(p) == args.repo]
+        if not paths:
+            print(f"devpit: no repo named {args.repo}", file=sys.stderr)
+            return 1
+    data = sizes_mod.scan(paths, cfg, rescan=args.rescan)
+    if args.json:
+        print(json.dumps(data, indent=2))
+        return 0
+
+    rows = sorted(data["sizes"].values(), key=lambda v: v["total_mb"], reverse=True)
+    for v in rows:
+        name = Path(v.get("path", "?")).name
+        eaters = "  ".join(
+            paint(f"{e['name']} {_mb(e['mb'])}", "yellow" if e["known"] else "dim")
+            for e in v["eaters"][:3])
+        recl = paint(f"  {_mb(v['reclaimable_mb'])} reclaimable", "cyan") if v["reclaimable_mb"] else ""
+        print(f"  {paint(name, 'bold'):<26} {_mb(v['total_mb']):>8}   {eaters}{recl}")
+    total = sum(v["total_mb"] for v in rows)
+    recl = sum(v["reclaimable_mb"] for v in rows)
+    print(f"\n  {len(rows)} repos, {_mb(total)} total, {paint(_mb(recl) + ' reclaimable', 'cyan')}"
+          f"  ({data['measured']} measured, {data['from_cache']} cached, {data['duration_ms']} ms)")
     return 0
 
 
@@ -112,6 +146,12 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("repos", help="every repo, with git state")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_repos)
+
+    p = sub.add_parser("size", help="disk used per repo, and what is eating it")
+    p.add_argument("--repo", help="a single repo")
+    p.add_argument("--rescan", action="store_true", help="ignore cached measurements")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_size)
 
     p = sub.add_parser("note", help="per-repo notes (defaults to the current repo)")
     p.add_argument("action", nargs="?", default="show",

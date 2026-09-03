@@ -48,10 +48,21 @@ A directory qualifies if it contains `.git`.
 | **time spent** | focus log, §5 | read of a local file |
 | **notes** | `~/.local/share/devpit/notes/<id>.md` | file read |
 
-### Disk: cached, never on the hot path
-Measured here: `du` across the project roots is slow because one repo is huge —
-**gmat-pred is 29.3 GB** (28 GB of it `data/`, 1 GB `models/`, and a 13 MB `.git`).
-So:
+### Disk: cached, but not for the reason assumed
+
+**Correction (built 2026-09-03).** The original claim here — that `du` is slow
+because one repo is huge — is wrong. `du` cost tracks **file count, not bytes**:
+gmat-pred is 29 GB but only 11.6k files and measures in **15 ms**, about the same
+as a 294 MB `node_modules` with 10.6k files.
+
+A single `du -m --max-depth=1` per repo yields the total *and* the breakdown in one
+pass: **279 ms** for all ten repos, against 459 ms when subdirectories were measured
+individually. (`-s` and `--max-depth` are mutually exclusive in GNU du — passing
+both makes it exit silently, which briefly produced a very flattering 9 ms.)
+
+So the cache exists to keep the panel's *open* instant, not because measuring is
+expensive. Cached reads are 10 ms. That makes a background refresh cheap and
+routine rather than something to avoid.
 
 - sizes are computed in the background and **cached with a timestamp**
 - the UI shows the cached number and when it was measured
