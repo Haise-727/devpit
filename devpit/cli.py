@@ -13,6 +13,7 @@ from pathlib import Path
 from . import config as cfg_mod
 from . import notes as notes_mod
 from . import repos as repos_mod
+from . import actions as actions_mod
 from . import monitor as monitor_mod
 from . import sizes as sizes_mod
 
@@ -164,6 +165,47 @@ def cmd_monitor(args) -> int:
     return 0
 
 
+def cmd_do(args) -> int:
+    cfg = cfg_mod.load()
+    if args.action == "list":
+        for name, desc in actions_mod.ACTIONS.items():
+            print(f"  {paint(name, 'bold'):<28} {desc}")
+        return 0
+    try:
+        plan = actions_mod.plan_for(args.action, args.target or "", cfg)
+    except actions_mod.ActionError as e:
+        print(paint(f"  {e}", "red"), file=sys.stderr)
+        return 1
+
+    if args.json and not args.yes:
+        print(json.dumps(plan, indent=2))
+        return 0
+
+    # Preview. Nothing has happened yet.
+    print(f"  {paint(plan['action'], 'bold')}  {plan['target']}")
+    print(f"    {plan['detail']}")
+    for w in plan["warnings"]:
+        print(paint(f"    ! {w}", "yellow"))
+
+    if not args.yes:
+        if plan["destructive"]:
+            print(paint("\n  nothing done. re-run with --yes to go ahead.", "cyan"))
+        else:
+            print(paint("\n  nothing done. re-run with --yes.", "cyan"))
+        return 0
+
+    try:
+        result = actions_mod.execute(plan, cfg)
+    except actions_mod.ActionError as e:
+        print(paint(f"    failed: {e}", "red"), file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print(paint(f"    {result['message']}", "green"))
+    return 0
+
+
 def cmd_note(args) -> int:
     cfg = cfg_mod.load()
     found = notes_mod.resolve(args.repo, cfg)
@@ -230,6 +272,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--all-ports", action="store_true", help="include loopback/editor sockets")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_monitor)
+
+    p = sub.add_parser("do", help="act on something the monitor showed")
+    p.add_argument("action", help="an action name, or 'list'")
+    p.add_argument("target", nargs="?", help="container name, port, or path")
+    p.add_argument("--yes", action="store_true",
+                   help="actually do it (without this you only get the preview)")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_do)
 
     p = sub.add_parser("note", help="per-repo notes (defaults to the current repo)")
     p.add_argument("action", nargs="?", default="show",
