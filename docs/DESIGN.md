@@ -70,14 +70,46 @@ one or two other top-level directories. Real examples on this machine today:
 The wanted behaviour: switch to a repo, and its VSCode and browser come back as
 they were.
 
-### How this actually works: park, do not close
+### A repo owns a ROW, not a single workspace
 
-**Warm switch (the normal case): windows are never closed.** Each repo is bound to
-a Hyprland workspace. Switching repos switches workspace. The VSCode window and the
-browser window simply stay where they are.
+Workspaces here are already grouped in tens: 1–10 is row 1, 11–20 is row 2, and so
+on. **A repo binds to a row.** Inside its row it still has all ten workspaces —
+editor on one, browser on another, terminal on a third — exactly as now.
 
-This is lossless, instant, and needs no session files at all. It is strictly better
-than saving and restoring state, and it is why this is the primary mechanism.
+Switching repo means jumping rows. That is the whole mechanism.
+
+**Missing bind, needed for this:** today you can *move a window* to row N
+(`Ctrl+Super+Alt+N`) but there is **no bind to go to row N**. Navigating rows has to
+exist before repo switching can.
+
+### Park, do not close
+
+**Windows are never closed on a switch.** They stay on their row. Nothing is
+snapshotted, nothing is restored, and switching is instant and lossless.
+
+### "Isn't parking heavy?"
+
+Fair question. The cost is real but bounded, and it is not what it first looks
+like:
+
+- Parked windows cost exactly what they would cost open anyway. Switching to a repo
+  you are *actively working on* is not extra memory — it is the memory you were
+  already spending.
+- The cost only grows if you park **many** repos at once. With 9 repos on this
+  machine, keeping all of them holding a VSCode and a browser would be genuinely
+  heavy.
+
+So parking is for the **two or three repos you are switching between**, not all of
+them. devpit makes that manageable rather than implicit:
+
+- **Report RAM per bound row**, so the cost is visible instead of mysterious. This
+  is just another monitor row (§4).
+- **"Close this repo's windows"** as an explicit action, returning that row to cold.
+- A cold row restores via §3's cold-start path when you next enter it.
+
+The alternative — closing and restoring on every switch — trades that memory for
+seconds of latency *and* fidelity loss on every single switch. Parking is the right
+default; visibility and an easy eviction are what keep it honest.
 
 ### Cold start (after a reboot) — and an honest limit
 
@@ -100,7 +132,7 @@ Only here does anything need restoring.
 
 ### What a session record holds
 ```jsonc
-{ "repo": "gmat-pred", "workspace": 3,
+{ "repo": "gmat-pred", "row": 3,
   "launch": [ {"cmd": "code",    "args": ["<path>"]},
               {"cmd": "kitty",   "args": ["--directory", "<path>"]} ],
   "urls":   ["https://…"],
@@ -165,6 +197,31 @@ Per-repo notes, plain **Markdown**, one file per repo.
 default — notes are personal (todos, gotchas, half-thoughts) and should not land in
 a commit. Opt in per repo to keep them in-repo at `.devpit/notes.md` instead.
 
+### Structure: pinned context, then a log
+
+One file, two parts, so it stays a single `cat`-able Markdown document:
+
+```markdown
+# gmat-pred
+<!-- pinned -->
+Context that stays true: what this project is, conventions, gotchas.
+This is what an agent should read first.
+<!-- /pinned -->
+
+## Log
+- 2026-09-03 14:02 — retrained on the new split, AUC 0.81
+- 2026-09-02 09:40 — data/ is 28GB, do not add it to git
+```
+
+The pinned block is durable project context; the log is chronological and appended
+to. An agent reads the whole file and knows which half is which.
+
+### Rendered, not raw, in the GUI
+Markdown on disk, but the app **renders** it — headings, checkboxes, code blocks,
+links — rather than showing a text dump. The pinned block gets its own visual
+treatment at the top, and the log reads as entries. Editing is inline; the file on
+disk stays plain Markdown at all times.
+
 **CLI, because an AI agent will use this more than the GUI:**
 ```
 devpit note                    # print the current repo's notes
@@ -220,15 +277,46 @@ Each step ends with something runnable.
 
 ---
 
-## 10. Open questions
+## 10. Suggestions worth folding in
 
-- **Repo identity.** Path, or git remote URL? Path is simpler; remote survives a
-  move and matches clones on other machines. Leaning: remote when there is one,
-  else path hash.
-- **Does a repo own a workspace, or does a workspace own a repo?** Affects what
-  happens when you open two repos at once. Suggest: a repo may claim at most one
-  workspace, and claiming is explicit.
+Proposed 2026-09-03, not yet accepted.
+
+### Cheap, high value
+- **The bar shows the current row's repo** — name, branch, dirty count, while you
+  are on a bound row. One glance tells you which repo you are in, which matters far
+  more once rows are repos. Ashura's side, and small.
+- **The overview labels rows with their repo.** The workspace grid already draws
+  rows; naming them turns the overview into a repo switcher for free.
+- **Quick-note keybind** — append a line to the current row's repo notes from
+  anywhere, without opening the app. Notes only get written if capturing is
+  frictionless.
+
+### Makes parking honest
+- **RAM per bound row** in the monitor tab, with "close this repo's windows" beside
+  it. Turns the parking cost from invisible into a number you can act on (§3).
+
+### Reduces setup friction
+- **Suggest the binding.** When you first use a row that has a VSCode window with
+  folder X open, offer to bind that row to repo X rather than asking cold.
+
+### On switching in
+- **A resume card**: pinned notes, last commit, dirty count — shown briefly when you
+  enter a repo's row. Answers "where was I" without opening anything. Fits the
+  notes structure directly (§6).
+
+---
+
+## 11. Open questions
+
+- ~~Repo identity~~ — **RESOLVED 2026-09-03: git remote URL when there is one,
+  else a hash of the path.** Survives moves and matches clones on other machines.
+- ~~Workspace ownership~~ — **RESOLVED 2026-09-03. Not exclusive.** A *row* may have
+  a repo bound to it; several rows may be bound to different repos at once, so two
+  or more repos are open simultaneously by design. The binding is chosen when a new
+  row is first used, and is editable in settings afterwards. Nothing prevents two
+  rows pointing at the same repo.
 - **Editor and terminal commands** — `code <path>`, `kitty --directory <path>`,
   routed through `app2unit` in the rice. Confirm.
-- **Do stopped containers and dangling images get flagged as reclaimable**, the way
-  stale venvs do? Leaning yes — same "space you forgot about" idea.
+- ~~Flag stopped containers and dangling images as reclaimable?~~ —
+  **RESOLVED 2026-09-03: yes**, same treatment as stale venvs. Anything reclaimable
+  is tagged with the bytes it would return.
