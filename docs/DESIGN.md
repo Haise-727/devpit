@@ -81,16 +81,33 @@ one or two other top-level directories. Real examples on this machine today:
 The wanted behaviour: switch to a repo, and its VSCode and browser come back as
 they were.
 
-### Two separate spaces  🔒 DECIDED 2026-09-03
+### Two separate spaces, and workspaces as a resource  🔒 DECIDED 2026-09-03
 
 Cockpits are **not** special workspaces and **not** part of user space. They are a
-second space with their own workspace numbers and their own keybind mode.
+second space with their own keybind mode.
 
 ```
-user space      workspaces   1-50    rows 1-10, five workspaces each
-startup dash    workspace      99
-cockpit space   workspaces 101-150   cockpit rows 1-10, five workspaces each
+user space    ids   1-99    startup dashboard is id 6, kept out of the pool
+cockpit N     ids  N00+1 .. N00+99
 ```
+
+**What you see is a position, not an id.** A cockpit holding two workspaces shows
+them as 1 and 2 whatever their real ids are; user space stays 1..n however many you
+have. Each space grows to whatever you actually use — nothing is preallocated and
+no space has a fixed size.
+
+**Derived live, deliberately not mapped.** The obvious implementation is a table
+of display→real and a service to maintain it. That would be wrong here: Hyprland
+destroys a workspace the moment it is empty (verified — visiting workspace 42 then
+leaving removed it), so a stored table is stale within seconds and needs
+reconciling on every change, plus persistence across restarts and an IPC hop on
+every keypress. Asking `hl.get_workspaces()` for the live list costs nothing, runs
+in-process, and cannot drift.
+
+**The trade-off, stated plainly:** because empty workspaces are destroyed,
+positions compact. Close everything on position 1 and what was position 2 becomes
+position 1. That *is* the requested compaction, but it means positions are not
+stable names. Workspaces persist for as long as they hold windows.
 
 User space is untouched — `Ctrl+Super+3` still goes to row 3, workspace 11 is
 reachable exactly as before, and no user workspace is consumed by a cockpit.
