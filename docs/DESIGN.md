@@ -81,6 +81,36 @@ one or two other top-level directories. Real examples on this machine today:
 The wanted behaviour: switch to a repo, and its VSCode and browser come back as
 they were.
 
+### Two separate spaces  🔒 DECIDED 2026-09-03
+
+Cockpits are **not** special workspaces and **not** part of user space. They are a
+second space with their own workspace numbers and their own keybind mode.
+
+```
+user space      workspaces   1-50    rows 1-10, five workspaces each
+startup dash    workspace      99
+cockpit space   workspaces 101-150   cockpit rows 1-10, five workspaces each
+```
+
+User space is untouched — `Ctrl+Super+3` still goes to row 3, workspace 11 is
+reachable exactly as before, and no user workspace is consumed by a cockpit.
+
+**Entering a cockpit switches keybind mode.** `Super+D` focuses cockpit row 1 and
+enters Hyprland's `cockpit` submap, which rebinds workspace navigation to cockpit
+space. While inside, `Super+1..5` and `Ctrl+Super+1..0` move around *cockpits* —
+you cannot wander back into user space by accident. `Super+D` or `Super+Escape`
+leaves, returning to the exact user workspace you came from.
+
+Everything that is not workspace navigation is declared `submap_universal`, so
+media keys, screenshots, the launcher and window management keep working inside a
+cockpit. Verified: volume keys still respond in cockpit mode.
+
+Each cockpit is a **row of five workspaces**, so a repo's cockpit can hold as many
+windows as you want rather than being a single panel.
+
+The bar shows `c1` in the accent colour while in cockpit space, against `r3` in
+user space, so the current mode is never ambiguous.
+
 ### A repo owns a ROW: five workspaces
 
 **Settled 2026-09-03.** A row is **five** workspaces — 1–5 is row 1, 6–10 row 2,
