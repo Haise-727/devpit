@@ -91,23 +91,26 @@ user space    ids   1-99    startup dashboard is id 6, kept out of the pool
 cockpit N     ids  N00+1 .. N00+99
 ```
 
-**What you see is a position, not an id.** A cockpit holding two workspaces shows
-them as 1 and 2 whatever their real ids are; user space stays 1..n however many you
-have. Each space grows to whatever you actually use — nothing is preallocated and
-no space has a fixed size.
+**Slot n of a space is `base + n`.** Cockpit 2 slot 4 is workspace 204 and reads
+as "4"; user slot 4 is workspace 4 and reads as "4". The id is never shown, so each
+space numbers from 1 and nothing is preallocated — a workspace exists once you go
+to it.
 
-**Derived live, deliberately not mapped.** The obvious implementation is a table
-of display→real and a service to maintain it. That would be wrong here: Hyprland
+**No mapping service, and none needed.** The obvious implementation is a table of
+display→real ids kept by a daemon. That would be actively wrong here: Hyprland
 destroys a workspace the moment it is empty (verified — visiting workspace 42 then
-leaving removed it), so a stored table is stale within seconds and needs
-reconciling on every change, plus persistence across restarts and an IPC hop on
-every keypress. Asking `hl.get_workspaces()` for the live list costs nothing, runs
-in-process, and cannot drift.
+leaving removed it), so a stored table goes stale within seconds, needs persistence
+across restarts, and puts an IPC hop in every keypress. Arithmetic needs none of it.
 
-**The trade-off, stated plainly:** because empty workspaces are destroyed,
-positions compact. Close everything on position 1 and what was position 2 becomes
-position 1. That *is* the requested compaction, but it means positions are not
-stable names. Workspaces persist for as long as they hold windows.
+**Rejected: display-by-position.** A first version numbered slots by the position
+of workspaces that happened to exist, which compacts gaps away. Two bugs killed it:
+with 1 and 2 open, pressing 4 allocated the next id after the highest and landed on
+3 — you could not jump ahead — and positions shuffled whenever a workspace emptied
+and was destroyed. Direct addressing is worth more than hiding gaps, so the bar
+shows `1 2 4` with an honest gap rather than renumbering behind you.
+
+The **startup dashboard is user slot 6**, so `Super+6` reaches it like any other
+slot. It is an ordinary workspace that happens to have the dashboard drawn on it.
 
 User space is untouched — `Ctrl+Super+3` still goes to row 3, workspace 11 is
 reachable exactly as before, and no user workspace is consumed by a cockpit.
