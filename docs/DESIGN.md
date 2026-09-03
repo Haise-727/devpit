@@ -81,17 +81,27 @@ one or two other top-level directories. Real examples on this machine today:
 The wanted behaviour: switch to a repo, and its VSCode and browser come back as
 they were.
 
-### A repo owns a ROW, not a single workspace
+### A repo owns a ROW: five workspaces
 
-Workspaces here are already grouped in tens: 1–10 is row 1, 11–20 is row 2, and so
-on. **A repo binds to a row.** Inside its row it still has all ten workspaces —
-editor on one, browser on another, terminal on a third — exactly as now.
+**Settled 2026-09-03.** A row is **five** workspaces — 1–5 is row 1, 6–10 row 2,
+11–15 row 3 — which is what the overview actually draws (`rows: 2, columns: 5`), so
+one overview page shows **two repos**.
 
-Switching repo means jumping rows. That is the whole mechanism.
+This replaced an earlier reading of "row" as the old group of ten. The Hyprland
+binds were reworked to match:
 
-**Missing bind, needed for this:** today you can *move a window* to row N
-(`Ctrl+Super+Alt+N`) but there is **no bind to go to row N**. Navigating rows has to
-exist before repo switching can.
+| Bind | Does |
+|---|---|
+| `Super+1..5` | workspace 1–5 *within the current row* |
+| `Super+Shift+1..5` | move the window there |
+| `Ctrl+Super+1..0` | **go to row 1–10** — this is the repo switch |
+| `Ctrl+Super+Alt+1..0` | move the window to that row |
+
+Going to a row **keeps your slot**: from row 1 workspace 2, `Ctrl+Super+3` lands on
+workspace 12, not 11. So switching repo puts you on the equivalent workspace rather
+than always the first. Verified with real keypresses.
+
+Ten rows is ten repos, more than currently exist.
 
 ### Park, do not close
 
