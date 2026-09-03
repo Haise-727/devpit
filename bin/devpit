@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Run devpit without installing it. Once packaged, `pip install -e .` provides
+# the same entry point and this shim becomes optional.
+exec python3 -m devpit "$@"

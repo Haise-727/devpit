@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "devpit"
+version = "0.1.0"
+description = "A developer cockpit for the repos and clutter on your machine"
+requires-python = ">=3.11"
+dependencies = []          # deliberately none - it shells out to git/docker/ss
+
+[project.scripts]
+devpit = "devpit.cli:main"
+
+[tool.setuptools]
+packages = ["devpit"]
