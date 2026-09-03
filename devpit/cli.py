@@ -13,6 +13,7 @@ from pathlib import Path
 from . import config as cfg_mod
 from . import notes as notes_mod
 from . import repos as repos_mod
+from . import monitor as monitor_mod
 from . import sizes as sizes_mod
 
 C = {"reset": "\033[0m", "dim": "\033[2m", "bold": "\033[1m",
@@ -91,6 +92,78 @@ def cmd_size(args) -> int:
     return 0
 
 
+def cmd_monitor(args) -> int:
+    cfg = cfg_mod.load()
+    data = monitor_mod.scan(cfg)
+    if args.json:
+        print(json.dumps(data, indent=2))
+        return 0
+
+    d = data["docker"]
+    print(paint("  containers", "bold"))
+    if not d.get("available"):
+        print(paint(f"    unavailable: {d.get('reason', 'docker not usable')}", "red"))
+    elif not d["containers"]:
+        print(paint("    none", "dim"))
+    else:
+        for c in d["containers"]:
+            colour = "green" if c["state"] == "running" else "dim"
+            tag = paint("reclaimable", "cyan") if c["reclaimable"] else ""
+            print(f"    {paint(c['state'][:7], colour):<16} {c['name'][:24]:<26}"
+                  f"{c['image'][:30]:<32} {tag}")
+
+    if d.get("available"):
+        dang = [i for i in d["images"] if i["dangling"]]
+        print(paint(f"\n  images ({len(d['images'])})", "bold"))
+        for i in d["images"][:8]:
+            name = "<dangling>" if i["dangling"] else f"{i['repo']}:{i['tag']}"
+            print(f"    {name[:44]:<46} {i['size']:>10}"
+                  f" {paint('reclaimable', 'cyan') if i['reclaimable'] else ''}")
+        print(paint(f"\n  volumes ({len(d['volumes'])})", "bold"))
+        for v in d["volumes"][:8]:
+            print(f"    {v['name'][:30]:<32} {paint(v['path'], 'dim')}")
+        if d.get("usage"):
+            bits = "  ".join(f"{k.replace('_',' ')} {v['size']}"
+                             f"{paint(' (' + v['reclaimable'] + ' free-able)', 'cyan') if v.get('reclaimable') else ''}"
+                             for k, v in d["usage"].items())
+            print(f"\n  {paint('docker disk', 'bold')}  {bits}")
+
+    print(paint("\n  virtualenvs", "bold"))
+    if not data["venvs"]:
+        print(paint("    none", "dim"))
+    for v in data["venvs"]:
+        flags = []
+        if v["orphaned"]:
+            flags.append(paint("orphaned", "red"))
+        if v["stale"]:
+            flags.append(paint("stale", "yellow"))
+        print(f"    {v['project'][:20]:<22} python {v['python']:<9} {_mb(v['mb']):>7}"
+              f"  {v['stale_days']}d  {' '.join(flags)}")
+        print(f"      {paint(v['path'], 'dim')}")
+
+    if data["units_failed"]:
+        print(paint("\n  failed units", "bold"))
+        for u in data["units_failed"]:
+            print(f"    {paint(u['unit'], 'red')}  {u['description']}")
+
+    interesting = [p for p in data["ports"] if p["interesting"]]
+    hidden = len(data["ports"]) - len(interesting)
+    print(paint("\n  listening ports", "bold"))
+    shown = data["ports"] if args.all_ports else interesting
+    if not shown:
+        print(paint("    none worth showing", "dim"))
+    for p in shown:
+        print(f"    {p['port']:<8} {p['addr'][:22]:<24} {p['proc'][:18]:<20}"
+              f" {paint('noise', 'dim') if p['noise'] else ''}")
+    if hidden and not args.all_ports:
+        print(paint(f"    … {hidden} loopback/editor sockets hidden (--all-ports)", "dim"))
+
+    for e in data["errors"]:
+        print(paint(f"\n  {e['source']}: {e['message']}", "red"))
+    print(f"\n  {data['duration_ms']} ms")
+    return 0
+
+
 def cmd_note(args) -> int:
     cfg = cfg_mod.load()
     found = notes_mod.resolve(args.repo, cfg)
@@ -152,6 +225,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--rescan", action="store_true", help="ignore cached measurements")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_size)
+
+    p = sub.add_parser("monitor", help="containers, images, volumes, venvs, units, ports")
+    p.add_argument("--all-ports", action="store_true", help="include loopback/editor sockets")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_monitor)
 
     p = sub.add_parser("note", help="per-repo notes (defaults to the current repo)")
     p.add_argument("action", nargs="?", default="show",
