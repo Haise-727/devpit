@@ -78,6 +78,16 @@ one or two other top-level directories. Real examples on this machine today:
 
 ## 3. Sessions — switching repos and getting your windows back
 
+> **Superseded 2026-11-07 (Haise's decision for the end-4 based Ashura).** There is
+> ONE shared special workspace, `special:cockpit`. Inside it you pick a repo and
+> that repo's windows swap in; the others stay parked out of sight. Cockpits are
+> opt-in per repo (`devpit cockpit add`). Nothing launches at login: engaging a
+> cockpit brings it in, leaving hides it, and there is an explicit "close this
+> repo fully". A repo's first open launches VS Code, kitty and Firefox in it
+> (`devpit cockpit spec`). Window placement, tagging and hiding are done by the
+> rice's Hyprland config, not by devpit. The row and 100-apart space models below
+> are kept as history only.
+
 The wanted behaviour: switch to a repo, and its VSCode and browser come back as
 they were.
 
