@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from . import config as cfg_mod
+from . import cockpit as cockpit_mod
 from . import notes as notes_mod
 from . import repos as repos_mod
 from . import actions as actions_mod
@@ -253,6 +254,64 @@ def cmd_note(args) -> int:
     return 0
 
 
+def cmd_cockpit(args) -> int:
+    cfg = cfg_mod.load()
+    try:
+        if args.action == "list":
+            data = cockpit_mod.listing(cfg)
+        elif args.action == "candidates":
+            data = cockpit_mod.candidates(cfg)
+        elif args.action == "add":
+            data = cockpit_mod.add(args.repo, cfg)
+        elif args.action == "remove":
+            if not args.repo:
+                raise cockpit_mod.CockpitError("name the repo whose cockpit to remove")
+            data = cockpit_mod.remove(args.repo, cfg)
+        elif args.action == "spec":
+            if not args.repo:
+                raise cockpit_mod.CockpitError("name the repo")
+            data = cockpit_mod.spec(args.repo, cfg)
+        else:  # urls
+            if not args.repo:
+                raise cockpit_mod.CockpitError("name the repo")
+            data = cockpit_mod.set_urls(args.repo, args.urls, cfg)
+    except cockpit_mod.CockpitError as e:
+        if args.json:
+            print(json.dumps({"error": str(e)}))
+        else:
+            print(paint(f"  {e}", "red"), file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(data, indent=2))
+        return 0
+    if args.action == "list":
+        if not data["cockpits"]:
+            print(paint("  no cockpits yet - devpit cockpit add <repo>", "dim"))
+        for c in data["cockpits"]:
+            if not c["exists"]:
+                print(f"  {paint(c['name'], 'red'):<26} missing  {paint(c['path'], 'dim')}")
+                continue
+            g = c["git"]
+            dirty = (g["dirty"] or 0) + (g["staged"] or 0) + (g["untracked"] or 0)
+            state = paint(f"{dirty}~", "yellow") if dirty else paint("clean", "green")
+            print(f"  {paint(c['name'], 'bold'):<26} {(g['branch'] or '?')[:24]:<26} {state}")
+    elif args.action == "candidates":
+        for c in data["candidates"]:
+            print(f"  {paint(c['name'], 'bold'):<26} {paint(c['path'], 'dim')}")
+    elif args.action == "add":
+        c = data["cockpit"]
+        print(f"  {'added' if data['added'] else 'already has a cockpit:'} {c['name']}")
+    elif args.action == "remove":
+        print(f"  removed the cockpit for {data['removed']['name']} (the repo itself is untouched)")
+    elif args.action == "spec":
+        for item in data["launch"]:
+            print("  " + " ".join(item["cmd"]))
+    else:
+        print(f"  {len(data['cockpit']['urls'])} urls for {data['cockpit']['name']}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="devpit",
                                  description="a developer cockpit for your repos and clutter")
@@ -289,6 +348,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--limit", type=int, default=20, help="log entries to show")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_note)
+
+    p = sub.add_parser("cockpit", help="the repos you opted in to, and what opening one launches")
+    p.add_argument("action", nargs="?", default="list",
+                   choices=["list", "candidates", "add", "remove", "spec", "urls"])
+    p.add_argument("repo", nargs="?", help="repo name, id or path (add defaults to the current repo)")
+    p.add_argument("urls", nargs="*", help="for `urls`: the full list of URLs to open (empty clears)")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_cockpit)
 
     args = ap.parse_args(argv)
     return args.func(args)
