@@ -104,7 +104,8 @@ def test_add_by_name_path_and_cwd(env, monkeypatch):
     assert cockpit.add(None, env["cfg"])["cockpit"]["name"] == "gamma"
     listed = cockpit.load(env["cfg"])["cockpits"]
     assert [x["name"] for x in listed] == ["alpha", "beta", "gamma"]
-    assert listed[1]["id"] == "github.com_me_beta"
+    # cockpit ids are per checkout (path based), never the remote
+    assert listed[1]["id"].startswith("beta-") and "github" not in listed[1]["id"]
 
 
 def test_add_twice_is_a_no_op_even_through_a_symlink(env):
@@ -129,11 +130,33 @@ def test_root_reached_through_a_symlink_still_dedupes(env):
     assert cockpit.add(str(env["projects"] / "alpha"), cfg)["added"] is False
 
 
+def test_two_checkouts_of_one_remote_get_distinct_ids(env):
+    a = make_repo(env["projects"], "app", remote="git@github.com:me/app.git")
+    b = make_repo(env["tmp"] / "Coding" / "college", "app-copy", remote="git@github.com:me/app.git")
+    ia = cockpit.add(str(a), env["cfg"])["cockpit"]["id"]
+    ib = cockpit.add(str(b), env["cfg"])["cockpit"]["id"]
+    assert ia != ib
+    cockpit.remove(ib, env["cfg"])           # removing one leaves the other alone
+    assert [c["id"] for c in cockpit.load(env["cfg"])["cockpits"]] == [ia]
+
+
+def test_spec_reports_whether_the_name_is_unique(env):
+    make_repo(env["projects"], "solo")
+    make_repo(env["projects"], "twin")
+    make_repo(env["tmp"] / "Coding" / "college", "twin")
+    cockpit.add("solo", env["cfg"])
+    cockpit.add(str(env["projects"] / "twin"), env["cfg"])
+    assert cockpit.spec("solo", env["cfg"])["unique_name"] is True
+    assert cockpit.spec(str((env["projects"] / "twin").resolve()), env["cfg"])["unique_name"] is False
+
+
 def test_default_launch_is_code_kitty_firefox(env):
     a = make_repo(env["projects"], "alpha")
     entry = cockpit.add("alpha", env["cfg"])["cockpit"]
     cmds = [x["cmd"][0] for x in entry["launch"]]
     assert cmds == ["code", "kitty", "firefox"]
+    # the cockpit's kitty is recognisable by its own window class
+    assert entry["launch"][1]["cmd"][1:3] == ["--class", cockpit.KITTY_CLASS]
     assert entry["launch"][0]["cmd"][1] == str(a.resolve())
 
 
@@ -142,7 +165,9 @@ def test_spec_appends_urls_to_firefox_only(env):
     cockpit.add("alpha", env["cfg"])
     cockpit.set_urls("alpha", ["https://a.example", "https://b.example"], env["cfg"])
     launch = cockpit.spec("alpha", env["cfg"])["launch"]
-    assert launch[2]["cmd"][-2:] == ["https://a.example", "https://b.example"]
+    # --new-window takes one url; the rest follow as tabs
+    assert launch[2]["cmd"] == ["firefox", "--new-window", "https://a.example"]
+    assert launch[3]["cmd"] == ["firefox", "--new-tab", "https://b.example"]
     assert "https://a.example" not in launch[0]["cmd"] + launch[1]["cmd"]
 
 
@@ -159,8 +184,9 @@ def test_remove_by_name_id_and_path(env):
     for n in ("alpha", "beta", "gamma"):
         make_repo(env["projects"], n, remote=f"git@github.com:me/{n}.git" if n == "beta" else None)
         cockpit.add(n, env["cfg"])
+    beta_id = next(c["id"] for c in cockpit.load(env["cfg"])["cockpits"] if c["name"] == "beta")
     cockpit.remove("alpha", env["cfg"])
-    cockpit.remove("github.com_me_beta", env["cfg"])
+    cockpit.remove(beta_id, env["cfg"])
     cockpit.remove(str(env["projects"] / "gamma"), env["cfg"])
     assert cockpit.load(env["cfg"])["cockpits"] == []
     with pytest.raises(cockpit.CockpitError):

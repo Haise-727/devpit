@@ -59,13 +59,31 @@ def _save(data: dict, cfg: dict) -> None:
     os.replace(tmp, p)
 
 
+# kitty gets its own window class so the window manager can tell a cockpit's
+# terminal from any other kitty with certainty (see Ashura's cockpit.lua).
+KITTY_CLASS = "kitty-cockpit"
+
+
 def default_launch(path: Path) -> list[dict]:
     """VS Code and kitty in the repo, and a fresh Firefox window (Haise's choice)."""
     return [
         {"cmd": ["code", str(path)]},
-        {"cmd": ["kitty", "--directory", str(path)]},
+        {"cmd": ["kitty", "--class", KITTY_CLASS, "--directory", str(path)]},
         {"cmd": ["firefox", "--new-window"]},
     ]
+
+
+def cockpit_id(path: Path) -> str:
+    """One id per checkout. Notes use the remote-based repo id so two clones share
+    notes, but a cockpit owns windows, so two checkouts of the same remote must
+    never share one (they would share a tag and a parking space)."""
+    return repo_id(path, None)
+
+
+def name_is_unique(name: str, cfg: dict) -> bool:
+    """True when no other discovered repo has this folder name. VS Code titles show
+    only the folder name, so matching a window by title is only safe when unique."""
+    return sum(1 for p in repos_mod.discover(cfg) if p.name == name) <= 1
 
 
 def resolve_repo(ref: str | None, cfg: dict) -> Path:
@@ -117,7 +135,7 @@ def add(ref: str | None, cfg: dict | None = None) -> dict:
     if existing:
         return {"added": False, "cockpit": existing}
     entry = {
-        "id": repo_id(path, remote_of(path)),
+        "id": cockpit_id(path),
         "name": path.name,
         "path": str(path),
         "added_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -156,16 +174,22 @@ def spec(ref: str, cfg: dict | None = None) -> dict:
     data = load(cfg)
     for c in data["cockpits"]:
         if ref in (c["name"], c["id"], c["path"]):
-            launch = []
+            cmds = []
+            urls = list(c.get("urls", []))
             for item in c["launch"]:
                 cmd = list(item["cmd"])
-                if cmd and cmd[0] == "firefox" and c.get("urls"):
-                    cmd += c["urls"]
-                # "shell" is the same command quoted for a shell, for callers that
-                # can only run a string (Hyprland's exec).
-                launch.append({"cmd": cmd, "shell": shlex.join(cmd)})
+                cmds.append(cmd)
+                if cmd and cmd[0] == "firefox" and urls:
+                    # --new-window takes ONE url; the rest open as tabs, which
+                    # Firefox puts in the window that was just opened.
+                    cmd.append(urls[0])
+                    cmds += [["firefox", "--new-tab", u] for u in urls[1:]]
+            # "shell" is the same command quoted for a shell, for callers that can
+            # only run a string (Hyprland's exec).
+            launch = [{"cmd": x, "shell": shlex.join(x)} for x in cmds]
             return {"id": c["id"], "name": c["name"], "path": c["path"],
-                    "exists": Path(c["path"]).is_dir(), "launch": launch}
+                    "exists": Path(c["path"]).is_dir(), "launch": launch,
+                    "unique_name": name_is_unique(c["name"], cfg)}
     raise CockpitError(f"{ref} has no cockpit")
 
 
