@@ -16,6 +16,7 @@ half-written list behind.
 from __future__ import annotations
 import json
 import os
+import shlex
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -160,7 +161,9 @@ def spec(ref: str, cfg: dict | None = None) -> dict:
                 cmd = list(item["cmd"])
                 if cmd and cmd[0] == "firefox" and c.get("urls"):
                     cmd += c["urls"]
-                launch.append({"cmd": cmd})
+                # "shell" is the same command quoted for a shell, for callers that
+                # can only run a string (Hyprland's exec).
+                launch.append({"cmd": cmd, "shell": shlex.join(cmd)})
             return {"id": c["id"], "name": c["name"], "path": c["path"],
                     "exists": Path(c["path"]).is_dir(), "launch": launch}
     raise CockpitError(f"{ref} has no cockpit")

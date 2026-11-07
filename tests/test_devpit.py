@@ -146,6 +146,15 @@ def test_spec_appends_urls_to_firefox_only(env):
     assert "https://a.example" not in launch[0]["cmd"] + launch[1]["cmd"]
 
 
+def test_spec_shell_form_is_quoted(env):
+    p = make_repo(env["projects"], "with space")
+    cockpit.add(str(p), env["cfg"])
+    item = cockpit.spec("with space", env["cfg"])["launch"][0]
+    import shlex
+    assert shlex.split(item["shell"]) == item["cmd"]
+    assert "'" in item["shell"]
+
+
 def test_remove_by_name_id_and_path(env):
     for n in ("alpha", "beta", "gamma"):
         make_repo(env["projects"], n, remote=f"git@github.com:me/{n}.git" if n == "beta" else None)
