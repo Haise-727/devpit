@@ -12,8 +12,10 @@ CONFIG_PATH = Path(os.environ.get("DEVPIT_CONFIG",
                                   Path.home() / ".config/devpit/config.json"))
 
 DEFAULTS = {
-    # Globs searched for repositories. A directory counts if it contains .git
-    "roots": ["~/Coding/Projects/*"],
+    # Globs searched for repositories. A directory counts if it contains .git.
+    # Two levels under ~/Coding, so ~/Coding/Projects/x and ~/Coding/college/x
+    # (or any future folder) are found without editing this.
+    "roots": ["~/Coding/*", "~/Coding/*/*"],
     # Repos outside the roots that should still be tracked
     "extra_repos": ["~/rice", "~/.config"],
     "data_dir":  "~/.local/share/devpit",
