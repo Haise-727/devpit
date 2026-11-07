@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
-# Run devpit without installing it. Once packaged, `pip install -e .` provides
-# the same entry point and this shim becomes optional.
-exec python3 -m devpit "$@"
+# Run devpit from a checkout, from any directory.
+# Uses the system python on purpose: `python3` on PATH can be a project virtualenv
+# (gmat-pred's, on this machine), and devpit must not depend on whichever one is active.
+here="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec /usr/bin/python3 -m devpit "$@"
