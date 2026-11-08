@@ -167,7 +167,9 @@ def test_spec_appends_urls_to_firefox_only(env):
     launch = cockpit.spec("alpha", env["cfg"])["launch"]
     # --new-window takes one url; the rest follow as tabs
     assert launch[2]["cmd"] == ["firefox", "--new-window", "https://a.example"]
-    assert launch[3]["cmd"] == ["firefox", "--new-tab", "https://b.example"]
+    # tabs are chained after the window, in one shell command, not raced
+    assert len(launch) == 3
+    assert launch[2]["shell"] == "firefox --new-window https://a.example && sleep 1 && firefox --new-tab https://b.example"
     assert "https://a.example" not in launch[0]["cmd"] + launch[1]["cmd"]
 
 

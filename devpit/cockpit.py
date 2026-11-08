@@ -185,8 +185,17 @@ def spec(ref: str, cfg: dict | None = None) -> dict:
                     cmd.append(urls[0])
                     cmds += [["firefox", "--new-tab", u] for u in urls[1:]]
             # "shell" is the same command quoted for a shell, for callers that can
-            # only run a string (Hyprland's exec).
-            launch = [{"cmd": x, "shell": shlex.join(x)} for x in cmds]
+            # only run a string (Hyprland's exec). The Firefox tab commands are
+            # chained after the window one: started together, a tab can land in
+            # another window or hit Firefox's profile lock.
+            launch = [{"cmd": x, "shell": shlex.join(x)} for x in cmds
+                      if not (x[:2] == ["firefox", "--new-tab"])]
+            tabs = [x for x in cmds if x[:2] == ["firefox", "--new-tab"]]
+            if tabs:
+                for item in launch:
+                    if item["cmd"][:2] == ["firefox", "--new-window"]:
+                        item["shell"] = " && sleep 1 && ".join([item["shell"]] + [shlex.join(t) for t in tabs])
+                        item["tabs"] = tabs
             return {"id": c["id"], "name": c["name"], "path": c["path"],
                     "exists": Path(c["path"]).is_dir(), "launch": launch,
                     "unique_name": name_is_unique(c["name"], cfg)}
