@@ -78,7 +78,12 @@ one or two other top-level directories. Real examples on this machine today:
 
 ## 3. Sessions — switching repos and getting your windows back
 
-> **Superseded 2026-11-07 (Haise's decision for the end-4 based Ashura).** There is
+> **Current design.** The cockpit is a space of its own in the window manager:
+> ten workspaces (101 to 110 in Ashura) apart from your own. devpit keeps the
+> opt-in list and each repo's launch spec (`devpit cockpit`); the window manager
+> files windows under the repo on stage and parks or restores them on a switch.
+>
+> **Superseded 2026-11-07, kept for the reasoning.** There is
 > ONE shared special workspace, `special:cockpit`. Inside it you pick a repo and
 > that repo's windows swap in; the others stay parked out of sight. Cockpits are
 > opt-in per repo (`devpit cockpit add`). Nothing launches at login: engaging a

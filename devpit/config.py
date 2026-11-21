@@ -1,8 +1,8 @@
 """Configuration, with defaults that work on a machine that has never seen devpit.
 
-Every key has a default, so the config file is optional and additive - the same
-pattern the Ashura shell uses, and the reason a package can be dropped onto a new
-machine and still run.
+Every key has a default, so the config file is optional and additive: a fresh
+machine runs with no config at all, and ~/.config/devpit/config.json only needs
+the keys you want to change.
 """
 from __future__ import annotations
 import json, os
@@ -13,11 +13,12 @@ CONFIG_PATH = Path(os.environ.get("DEVPIT_CONFIG",
 
 DEFAULTS = {
     # Globs searched for repositories. A directory counts if it contains .git.
-    # Two levels under ~/Coding, so ~/Coding/Projects/x and ~/Coding/college/x
-    # (or any future folder) are found without editing this.
-    "roots": ["~/Coding/*", "~/Coding/*/*"],
+    # Common places for code; two levels under ~/Coding, so ~/Coding/Projects/x
+    # and ~/Coding/college/x are both found. Set your own in the config file.
+    "roots": ["~/Coding/*", "~/Coding/*/*", "~/Projects/*", "~/projects/*",
+              "~/src/*", "~/code/*", "~/dev/*"],
     # Repos outside the roots that should still be tracked
-    "extra_repos": ["~/rice", "~/.config"],
+    "extra_repos": [],
     "data_dir":  "~/.local/share/devpit",
     # Thresholds for the flags in repos.py. Days.
     "stale_unpushed_days": 3,

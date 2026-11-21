@@ -53,7 +53,7 @@ def env(tmp_path, monkeypatch):
 # ------------------------------------------------------------------ identity
 @pytest.mark.parametrize("url,expected", [
     ("git@github.com:Haise-727/rice.git", "github.com/Haise-727/rice"),
-    ("https://github.com/end-4/dots-hyprland.git", "github.com/end-4/dots-hyprland"),
+    ("https://github.com/hyprwm/Hyprland.git", "github.com/hyprwm/Hyprland"),
     ("ssh://git@host:2222/team/app.git", "host/team/app"),
     ("https://user@gitlab.com/a/b/", "gitlab.com/a/b"),
 ])

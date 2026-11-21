@@ -1,8 +1,8 @@
-"""Cockpits: the repos Haise has opted in to, and what opening one launches.
+"""Cockpits: the repos you have opted in to, and what opening one launches.
 
 devpit only keeps the list and the launch spec. Putting windows on a workspace,
 tagging them and hiding them is the window manager's job (Ashura does it in its
-Hyprland config), so devpit stays usable without any particular desktop.
+Hyprland config, github.com/Haise-727/ashura), so devpit stays usable without any particular desktop.
 
 State lives in `<data_dir>/cockpits.json`:
 
@@ -60,12 +60,12 @@ def _save(data: dict, cfg: dict) -> None:
 
 
 # kitty gets its own window class so the window manager can tell a cockpit's
-# terminal from any other kitty with certainty (see Ashura's cockpit.lua).
+# terminal from any other kitty with certainty (Ashura's hypr/custom/cockpit.lua relies on it).
 KITTY_CLASS = "kitty-cockpit"
 
 
 def default_launch(path: Path) -> list[dict]:
-    """VS Code and kitty in the repo, and a fresh Firefox window (Haise's choice)."""
+    """VS Code and kitty in the repo, and a fresh Firefox window."""
     return [
         {"cmd": ["code", str(path)]},
         {"cmd": ["kitty", "--class", KITTY_CLASS, "--directory", str(path)]},
